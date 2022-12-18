@@ -24,20 +24,22 @@ var (
 		Selector:      ">",
 		Separator:     "__",
 		SelectorStyle: &ThemeDefault.SecondaryStyle,
+		HighlightStyle: &ThemeDefault.HighlightStyle,
 	}
 )
 
 // InteractiveSelectPrinter is a printer for interactive select menus.
 type InteractiveSelectPrinter struct {
-	TextStyle     *Style
-	DefaultText   string
-	Options       []string
-	OptionStyle   *Style
-	DefaultOption string
-	MaxHeight     int
-	Selector      string
-	SelectorStyle *Style
-	Separator     string
+	TextStyle      *Style
+	DefaultText    string
+	Options        []string
+	OptionStyle    *Style
+	DefaultOption  string
+	MaxHeight      int
+	Selector       string
+	SelectorStyle  *Style
+	HighlightStyle *Style
+	Separator      string
 
 	selectedOption        int
 	result                string
@@ -318,7 +320,7 @@ func (p *InteractiveSelectPrinter) renderSelectMenu() string {
 			continue
 		}
 		if i == p.selectedOption {
-			content += Sprintf("%s %s\n", p.renderSelector(), p.OptionStyle.Sprint(option))
+			content += Sprintf("%s %s\n", p.renderSelector(), p.HighlightStyle.Sprint(option))
 		} else {
 			content += Sprintf("%s %s\n", p.emptySelector, p.OptionStyle.Sprint(option))
 		}
