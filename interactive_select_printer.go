@@ -48,6 +48,7 @@ type InteractiveSelectPrinter struct {
 	textOptions           []string
 	displayedOptionsStart int
 	displayedOptionsEnd   int
+	emptySelector         string
 }
 
 // WithDefaultText sets the default text.
@@ -93,7 +94,7 @@ func (p *InteractiveSelectPrinter) Show(text ...string) (string, error) {
 
 	p.text = p.TextStyle.Sprint(text[0])
 	p.fuzzySearchMatches = append([]string{}, p.Options...)
-	p.textOptions = mapTo(p.Options, func(i string) *string {
+	p.textOptions = internal.MapNotNullTo(p.Options, func(i string) *string {
 		if i == p.Separator {
 			return nil
 		} else {
@@ -108,6 +109,12 @@ func (p *InteractiveSelectPrinter) Show(text ...string) (string, error) {
 	}
 
 	maxHeight := p.MaxHeight
+
+	p.emptySelector = ""
+
+	for range p.Selector {
+		p.emptySelector += " "
+	}
 
 	if maxHeight > len(p.fuzzySearchMatches) {
 		maxHeight = len(p.fuzzySearchMatches)
@@ -313,7 +320,7 @@ func (p *InteractiveSelectPrinter) renderSelectMenu() string {
 		if i == p.selectedOption {
 			content += Sprintf("%s %s\n", p.renderSelector(), p.OptionStyle.Sprint(option))
 		} else {
-			content += Sprintf("  %s\n", p.OptionStyle.Sprint(option))
+			content += Sprintf("%s %s\n", p.emptySelector, p.OptionStyle.Sprint(option))
 		}
 	}
 
@@ -330,15 +337,4 @@ func (p InteractiveSelectPrinter) renderFinishedMenu() string {
 
 func (p InteractiveSelectPrinter) renderSelector() string {
 	return p.SelectorStyle.Sprint(p.Selector)
-}
-
-func mapTo[I any, O any](data []I, f func(I) *O) []O {
-	var mapped []O
-	for _, e := range data {
-		m := f(e)
-		if m != nil {
-			mapped = append(mapped, *m)
-		}
-	}
-	return mapped
 }
