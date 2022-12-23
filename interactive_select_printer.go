@@ -15,15 +15,15 @@ import (
 var (
 	// DefaultInteractiveSelect is the default InteractiveSelect printer.
 	DefaultInteractiveSelect = InteractiveSelectPrinter{
-		TextStyle:     &ThemeDefault.PrimaryStyle,
-		DefaultText:   "Please select an option",
-		Options:       []string{},
-		OptionStyle:   &ThemeDefault.DefaultText,
-		DefaultOption: "",
-		MaxHeight:     5,
-		Selector:      ">",
-		Separator:     "__",
-		SelectorStyle: &ThemeDefault.SecondaryStyle,
+		TextStyle:      &ThemeDefault.PrimaryStyle,
+		DefaultText:    "Please select an option",
+		Options:        []string{},
+		OptionStyle:    &ThemeDefault.DefaultText,
+		DefaultOption:  "",
+		MaxHeight:      5,
+		Selector:       ">",
+		Separator:      "__",
+		SelectorStyle:  &ThemeDefault.SecondaryStyle,
 		HighlightStyle: &ThemeDefault.HighlightStyle,
 	}
 )
@@ -107,7 +107,12 @@ func (p *InteractiveSelectPrinter) Show(text ...string) (string, error) {
 	if p.MaxHeight == 0 {
 		p.MaxHeight = DefaultInteractiveSelect.MaxHeight
 	} else if p.MaxHeight < 0 {
+		terminalHeight := GetTerminalHeight() - 2
 		p.MaxHeight = len(p.Options)
+
+		if p.MaxHeight > terminalHeight {
+			p.MaxHeight = terminalHeight
+		}
 	}
 
 	maxHeight := p.MaxHeight
@@ -331,8 +336,9 @@ func (p *InteractiveSelectPrinter) renderSelectMenu() string {
 
 func (p InteractiveSelectPrinter) renderFinishedMenu() string {
 	var content string
-	content += Sprintf("%s: %s\n", p.text, p.fuzzySearchString)
-	content += Sprintf("  %s %s\n", p.renderSelector(), p.result)
+	//content += Sprintf("%s: %s\n", p.text, p.fuzzySearchString)
+	//content += Sprintf("  %s %s\n", p.renderSelector(), p.result)
+	content += Sprintf("%s: %s", p.text, p.result)
 
 	return content
 }
