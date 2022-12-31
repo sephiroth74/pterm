@@ -107,7 +107,7 @@ func (p *InteractiveSelectPrinter) Show(text ...string) (string, error) {
 	if p.MaxHeight == 0 {
 		p.MaxHeight = DefaultInteractiveSelect.MaxHeight
 	} else if p.MaxHeight < 0 {
-		terminalHeight := GetTerminalHeight() - 2
+		terminalHeight := GetTerminalHeight() - 3
 		p.MaxHeight = len(p.Options)
 
 		if p.MaxHeight > terminalHeight {
