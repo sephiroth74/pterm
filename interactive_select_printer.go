@@ -360,7 +360,6 @@ func (p InteractiveSelectPrinter) renderFinishedMenu() string {
 	var content string
 	content += Sprintf("%s: %s\n", p.text, p.fuzzySearchString)
 	content += Sprintf("  %s %s\n", p.renderSelector(), p.result)
-	// content += Sprintf("%s: %s", p.text, p.result)
 
 	return content
 }
