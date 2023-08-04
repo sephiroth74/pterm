@@ -15,15 +15,17 @@ import (
 var (
 	// DefaultInteractiveSelect is the default InteractiveSelect printer.
 	DefaultInteractiveSelect = InteractiveSelectPrinter{
-		TextStyle:     &ThemeDefault.PrimaryStyle,
-		DefaultText:   "Please select an option",
-		Options:       []string{},
-		OptionStyle:   &ThemeDefault.DefaultText,
-		DefaultOption: "",
-		MaxHeight:     5,
-		Selector:      ">",
-		SelectorStyle: &ThemeDefault.SecondaryStyle,
-		Filter:        true,
+		TextStyle:      &ThemeDefault.PrimaryStyle,
+		DefaultText:    "Please select an option",
+		Options:        []string{},
+		OptionStyle:    &ThemeDefault.DefaultText,
+		DefaultOption:  "",
+		MaxHeight:      5,
+		Selector:       ">",
+		Separator:      "__",
+		SelectorStyle:  &ThemeDefault.SecondaryStyle,
+		HighlightStyle: &ThemeDefault.HighlightStyle,
+		Filter:         true,
 	}
 )
 
@@ -39,6 +41,8 @@ type InteractiveSelectPrinter struct {
 	SelectorStyle   *Style
 	OnInterruptFunc func()
 	Filter          bool
+	HighlightStyle  *Style
+	Separator       string
 
 	selectedOption        int
 	result                string
@@ -46,8 +50,10 @@ type InteractiveSelectPrinter struct {
 	fuzzySearchString     string
 	fuzzySearchMatches    []string
 	displayedOptions      []string
+	textOptions           []string
 	displayedOptionsStart int
 	displayedOptionsEnd   int
+	emptySelector         string
 }
 
 // WithDefaultText sets the default text.
@@ -80,6 +86,12 @@ func (p InteractiveSelectPrinter) WithOnInterruptFunc(exitFunc func()) *Interact
 	return &p
 }
 
+// WithSeparator sets the separator string of the select menu.
+func (p InteractiveSelectPrinter) WithSeparator(separator string) *InteractiveSelectPrinter {
+	p.Separator = separator
+	return &p
+}
+
 // WithFilter sets the Filter option
 func (p InteractiveSelectPrinter) WithFilter(b ...bool) *InteractiveSelectPrinter {
 	p.Filter = internal.WithBoolean(b)
@@ -99,17 +111,38 @@ func (p *InteractiveSelectPrinter) Show(text ...string) (string, error) {
 
 	p.text = p.TextStyle.Sprint(text[0])
 	p.fuzzySearchMatches = append([]string{}, p.Options...)
+	p.textOptions = internal.MapNotNullTo(p.Options, func(i string) *string {
+		if i == p.Separator {
+			return nil
+		} else {
+			return &i
+		}
+	})
 
 	if p.MaxHeight == 0 {
 		p.MaxHeight = DefaultInteractiveSelect.MaxHeight
+	} else if p.MaxHeight < 0 {
+		terminalHeight := GetTerminalHeight() - 3
+		p.MaxHeight = len(p.Options)
+
+		if p.MaxHeight > terminalHeight {
+			p.MaxHeight = terminalHeight
+		}
 	}
 
 	maxHeight := p.MaxHeight
+
+	p.emptySelector = ""
+
+	for range p.Selector {
+		p.emptySelector += " "
+	}
+
 	if maxHeight > len(p.fuzzySearchMatches) {
 		maxHeight = len(p.fuzzySearchMatches)
 	}
 
-	if len(p.Options) == 0 {
+	if len(p.Options) == 0 || len(p.textOptions) == 0 {
 		return "", fmt.Errorf("no options provided")
 	}
 
@@ -200,22 +233,27 @@ func (p *InteractiveSelectPrinter) Show(text ...string) (string, error) {
 			if len(p.fuzzySearchMatches) == 0 {
 				return false, nil
 			}
-			if p.selectedOption > 0 {
-				p.selectedOption--
-				if p.selectedOption < p.displayedOptionsStart {
-					p.displayedOptionsStart--
-					p.displayedOptionsEnd--
-					if p.displayedOptionsStart < 0 {
-						p.displayedOptionsStart = 0
-						p.displayedOptionsEnd = maxHeight
+			for {
+				if p.selectedOption > 0 {
+					p.selectedOption--
+					if p.selectedOption < p.displayedOptionsStart {
+						p.displayedOptionsStart--
+						p.displayedOptionsEnd--
+						if p.displayedOptionsStart < 0 {
+							p.displayedOptionsStart = 0
+							p.displayedOptionsEnd = maxHeight
+						}
+						p.displayedOptions = append([]string{}, p.fuzzySearchMatches[p.displayedOptionsStart:p.displayedOptionsEnd]...)
 					}
+				} else {
+					p.selectedOption = len(p.fuzzySearchMatches) - 1
+					p.displayedOptionsStart = len(p.fuzzySearchMatches) - maxHeight
+					p.displayedOptionsEnd = len(p.fuzzySearchMatches)
 					p.displayedOptions = append([]string{}, p.fuzzySearchMatches[p.displayedOptionsStart:p.displayedOptionsEnd]...)
 				}
-			} else {
-				p.selectedOption = len(p.fuzzySearchMatches) - 1
-				p.displayedOptionsStart = len(p.fuzzySearchMatches) - maxHeight
-				p.displayedOptionsEnd = len(p.fuzzySearchMatches)
-				p.displayedOptions = append([]string{}, p.fuzzySearchMatches[p.displayedOptionsStart:p.displayedOptionsEnd]...)
+				if p.displayedOptions[p.selectedOption-p.displayedOptionsStart] != p.Separator {
+					break
+				}
 			}
 
 			area.Update(p.renderSelectMenu())
@@ -224,18 +262,24 @@ func (p *InteractiveSelectPrinter) Show(text ...string) (string, error) {
 				return false, nil
 			}
 			p.displayedOptions = p.fuzzySearchMatches[:maxHeight]
-			if p.selectedOption < len(p.fuzzySearchMatches)-1 {
-				p.selectedOption++
-				if p.selectedOption >= p.displayedOptionsEnd {
-					p.displayedOptionsStart++
-					p.displayedOptionsEnd++
+			for {
+				if p.selectedOption < len(p.fuzzySearchMatches)-1 {
+					p.selectedOption++
+					if p.selectedOption >= p.displayedOptionsEnd {
+						p.displayedOptionsStart++
+						p.displayedOptionsEnd++
+						p.displayedOptions = append([]string{}, p.fuzzySearchMatches[p.displayedOptionsStart:p.displayedOptionsEnd]...)
+					}
+				} else {
+					p.selectedOption = 0
+					p.displayedOptionsStart = 0
+					p.displayedOptionsEnd = maxHeight
 					p.displayedOptions = append([]string{}, p.fuzzySearchMatches[p.displayedOptionsStart:p.displayedOptionsEnd]...)
 				}
-			} else {
-				p.selectedOption = 0
-				p.displayedOptionsStart = 0
-				p.displayedOptionsEnd = maxHeight
-				p.displayedOptions = append([]string{}, p.fuzzySearchMatches[p.displayedOptionsStart:p.displayedOptionsEnd]...)
+
+				if p.displayedOptions[p.selectedOption-p.displayedOptionsStart] != p.Separator {
+					break
+				}
 			}
 
 			area.Update(p.renderSelectMenu())
@@ -262,6 +306,8 @@ func (p *InteractiveSelectPrinter) Show(text ...string) (string, error) {
 
 func (p *InteractiveSelectPrinter) renderSelectMenu() string {
 	var content string
+	var searchStringLen = len(p.fuzzySearchString)
+
 	if p.Filter {
 		content += Sprintf("%s %s: %s\n", p.text, p.SelectorStyle.Sprint("[type to search]"), p.fuzzySearchString)
 	} else {
@@ -269,14 +315,19 @@ func (p *InteractiveSelectPrinter) renderSelectMenu() string {
 	}
 
 	// find options that match fuzzy search string
-	rankedResults := fuzzy.RankFindFold(p.fuzzySearchString, p.Options)
-	// map rankedResults to fuzzySearchMatches
-	p.fuzzySearchMatches = []string{}
-	if len(rankedResults) != len(p.Options) {
-		sort.Sort(rankedResults)
-	}
-	for _, result := range rankedResults {
-		p.fuzzySearchMatches = append(p.fuzzySearchMatches, result.Target)
+	if p.Filter && searchStringLen > 0 {
+		rankedResults := fuzzy.RankFindFold(p.fuzzySearchString, p.textOptions)
+		// map rankedResults to fuzzySearchMatches
+		p.fuzzySearchMatches = []string{}
+		if len(rankedResults) != len(p.Options) {
+			sort.Sort(rankedResults)
+		}
+
+		for _, result := range rankedResults {
+			p.fuzzySearchMatches = append(p.fuzzySearchMatches, result.Target)
+		}
+	} else {
+		p.fuzzySearchMatches = append([]string{}, p.Options...)
 	}
 
 	if len(p.fuzzySearchMatches) != 0 {
@@ -296,9 +347,9 @@ func (p *InteractiveSelectPrinter) renderSelectMenu() string {
 			continue
 		}
 		if i == p.selectedOption {
-			content += Sprintf("%s %s\n", p.renderSelector(), p.OptionStyle.Sprint(option))
+			content += Sprintf("%s %s\n", p.renderSelector(), p.HighlightStyle.Sprint(option))
 		} else {
-			content += Sprintf("  %s\n", p.OptionStyle.Sprint(option))
+			content += Sprintf("%s %s\n", p.emptySelector, p.OptionStyle.Sprint(option))
 		}
 	}
 
@@ -309,6 +360,7 @@ func (p InteractiveSelectPrinter) renderFinishedMenu() string {
 	var content string
 	content += Sprintf("%s: %s\n", p.text, p.fuzzySearchString)
 	content += Sprintf("  %s %s\n", p.renderSelector(), p.result)
+	// content += Sprintf("%s: %s", p.text, p.result)
 
 	return content
 }
