@@ -102,8 +102,13 @@ func (p InteractiveSelectPrinter) WithFilter(b ...bool) *InteractiveSelectPrinte
 func (p *InteractiveSelectPrinter) Show(text ...string) (string, error) {
 	// should be the first defer statement to make sure it is executed last
 	// and all the needed cleanup can be done before
-	cancel, exit := internal.NewCancelationSignal(p.OnInterruptFunc)
-	defer exit()
+	var cancel func() = nil
+
+	if p.OnInterruptFunc != nil {
+		var exit func()
+		cancel, exit = internal.NewCancelationSignal(p.OnInterruptFunc)
+		defer exit()
+	}
 
 	if len(text) == 0 || Sprint(text[0]) == "" {
 		text = []string{p.DefaultText}
@@ -284,8 +289,11 @@ func (p *InteractiveSelectPrinter) Show(text ...string) (string, error) {
 
 			area.Update(p.renderSelectMenu())
 		case keys.CtrlC:
-			cancel()
-			return true, nil
+			if cancel != nil {
+				cancel()
+				return true, nil
+			}
+			return false, nil
 		case keys.Enter:
 			if len(p.fuzzySearchMatches) == 0 {
 				return false, nil
